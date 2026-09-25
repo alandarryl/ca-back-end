@@ -24,11 +24,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Modèle de requête avec gestion multi-provider
+# Modèle de requête avec gestion multi-provider & objectif
 class AuditRequest(BaseModel):
     company_name: str
     provider: str = Field(default="ollama", description="Fournisseur : 'ollama' ou 'gemini'")
     model_name: str = Field(default="qwen2.5:1.5b", description="Nom du modèle LLM")
+    objectif: str = Field(default="general", description="candidature, entretien, collaboration, etude_marche, general")
 
 @app.get("/")
 def read_root():
@@ -40,8 +41,11 @@ def get_available_models():
     local_models = []
     try:
         list_res = ollama.list()
-        # Extraction des noms de modèles locaux si le service Ollama tourne
-        local_models = [m['name'] for m in list_res.get('models', [])]
+        # Modèles sous forme d'objets (ollama-python >= 0.3.0) ou de dicts
+        for m in list_res.get('models', []):
+            name = getattr(m, 'model', None) or (m.get('model') or m.get('name') if isinstance(m, dict) else None)
+            if name:
+                local_models.append(name)
     except Exception:
         pass  # Ollama est éteint ou indisponible
 
@@ -60,12 +64,13 @@ async def create_audit(request: AuditRequest):
     try:
         raw_data = search_company_info(request.company_name)
         
-        # Transmission explicite des paramètres provider et model_name
+        # Passage du paramètre 'objectif'
         audit = generate_company_audit(
             company_name=request.company_name, 
             raw_data=raw_data,
             provider=request.provider,
-            model_name=request.model_name
+            model_name=request.model_name,
+            objectif=request.objectif
         )
         return audit
     except Exception as e:
@@ -83,15 +88,16 @@ async def create_audit_pdf(request: AuditRequest):
     try:
         raw_data = search_company_info(request.company_name)
         
-        # Transmission explicite des paramètres provider et model_name
+        # Passage du paramètre 'objectif'
         audit = generate_company_audit(
             company_name=request.company_name, 
             raw_data=raw_data,
             provider=request.provider,
-            model_name=request.model_name
+            model_name=request.model_name,
+            objectif=request.objectif
         )
         
-        pdf_buffer = generate_audit_pdf(audit)
+        pdf_buffer = generate_audit_pdf(audit, company_name=request.company_name)
         filename = f"audit_{request.company_name.lower().replace(' ', '_')}.pdf"
         
         return StreamingResponse(
