@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+python-dotenv
+duckduckgo-search
+pydantic
+google-genai
