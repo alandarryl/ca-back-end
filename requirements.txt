@@ -1,6 +1,6 @@
 fastapi
 uvicorn
-python-dotenv
-duckduckgo-search
 pydantic
+python-dotenv
 google-genai
+ddgs

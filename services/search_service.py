@@ -1,4 +1,8 @@
-from duckduckgo_search import DDGS
+# Remplace cette ligne :
+# from duckduckgo_search import DDGS
+
+# Par celle-ci :
+from ddgs import DDGS
 
 def search_company_info(company_name: str) -> str:
     """
@@ -17,7 +21,6 @@ def search_company_info(company_name: str) -> str:
             snippet = result.get("body", "")
             results_text.append(f"Titre: {title}\nRésumé: {snippet}\n")
 
-    # On fusionne le tout dans un seul texte propre
     return "\n---\n".join(results_text)
 
 # if __name__ == "__main__":
