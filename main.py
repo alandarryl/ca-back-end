@@ -1,8 +1,15 @@
-import ollama
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+
+# Import sécurisé d'Ollama
+try:
+    import ollama
+    OLLAMA_AVAILABLE = True
+except ImportError:
+    ollama = None
+    OLLAMA_AVAILABLE = False
 
 from services.search_service import search_company_info
 from services.ai_service import generate_company_audit
@@ -15,10 +22,13 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Configuration CORS
+# Configuration CORS (Autorise localhost et Vercel)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "https://*.vercel.app",  # Permet la connexion avec le frontend Vercel
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -39,20 +49,22 @@ def read_root():
 def get_available_models():
     """Renvoie la liste des modèles disponibles."""
     local_models = []
-    try:
-        list_res = ollama.list()
-        # Modèles sous forme d'objets (ollama-python >= 0.3.0) ou de dicts
-        for m in list_res.get('models', []):
-            name = getattr(m, 'model', None) or (m.get('model') or m.get('name') if isinstance(m, dict) else None)
-            if name:
-                local_models.append(name)
-    except Exception:
-        pass  # Ollama est éteint ou indisponible
+    
+    if OLLAMA_AVAILABLE and ollama is not None:
+        try:
+            list_res = ollama.list()
+            # Support objet ou dictionnaire
+            for m in list_res.get('models', []):
+                name = getattr(m, 'model', None) or (m.get('model') or m.get('name') if isinstance(m, dict) else None)
+                if name:
+                    local_models.append(name)
+        except Exception:
+            local_models = []
 
     return {
         "providers": {
             "ollama": local_models,
-            "gemini": ["gemini-2.5-flash", "gemini-3.8-flash"]
+            "gemini": ["gemini-2.5-flash", "gemini-2.5-pro"]
         }
     }
 
@@ -64,7 +76,6 @@ async def create_audit(request: AuditRequest):
     try:
         raw_data = search_company_info(request.company_name)
         
-        # Passage du paramètre 'objectif'
         audit = generate_company_audit(
             company_name=request.company_name, 
             raw_data=raw_data,
@@ -88,7 +99,6 @@ async def create_audit_pdf(request: AuditRequest):
     try:
         raw_data = search_company_info(request.company_name)
         
-        # Passage du paramètre 'objectif'
         audit = generate_company_audit(
             company_name=request.company_name, 
             raw_data=raw_data,
