@@ -64,7 +64,11 @@ def get_available_models():
     return {
         "providers": {
             "ollama": local_models,
-            "gemini": ["gemini-2.5-flash", "gemini-2.5-pro"]
+            "gemini": [
+                "gemini-2.5-flash",
+                "gemini-3.1-pro-preview",
+                "gemini-3.8-flash"
+            ]
         }
     }
 
