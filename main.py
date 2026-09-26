@@ -22,12 +22,12 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Configuration CORS (Autorise localhost et Vercel)
+# Configuration CORS permissive pour la production
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "https://*.vercel.app",  # Permet la connexion avec le frontend Vercel
+        "https://company-audit-theta.vercel.app",  # Ton domaine Vercel exact
     ],
     allow_credentials=True,
     allow_methods=["*"],
