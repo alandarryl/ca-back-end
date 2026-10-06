@@ -37,7 +37,7 @@ app.add_middleware(
 # Modèle de requête avec gestion multi-provider & objectif
 class AuditRequest(BaseModel):
     company_name: str
-    provider: str = Field(default="ollama", description="Fournisseur : 'ollama' ou 'gemini'")
+    provider: str = Field(default="ollama", description="Fournisseur : 'ollama', 'gemini' ou 'groq'")
     model_name: str = Field(default="qwen2.5:1.5b", description="Nom du modèle LLM")
     objectif: str = Field(default="general", description="candidature, entretien, collaboration, etude_marche, general")
 
@@ -68,6 +68,11 @@ def get_available_models():
                 "gemini-2.5-flash",
                 "gemini-3.1-pro-preview",
                 "gemini-3.8-flash"
+            ],
+            "groq": [
+                "openai/gpt-oss-120b",
+                "openai/gpt-oss-20b",
+                "meta-llama/llama-4-scout-17b-16e-instruct",
             ]
         }
     }

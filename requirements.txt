@@ -6,3 +6,4 @@ google-genai
 ddgs
 reportlab
 ollama
+groq

@@ -10,6 +10,14 @@ import ollama
 from dotenv import load_dotenv
 from schemas.audit_schema import CompanyAuditSchema
 
+# Import sécurisé de Groq (même logique défensive que pour Ollama dans main.py)
+try:
+    from groq import Groq
+    GROQ_AVAILABLE = True
+except ImportError:
+    Groq = None
+    GROQ_AVAILABLE = False
+
 load_dotenv()
 
 # ============================================================
@@ -17,6 +25,12 @@ load_dotenv()
 # ============================================================
 
 ObjectiveType = Literal["candidature", "entretien", "collaboration", "etude_marche", "general"]
+ProviderType = Literal["ollama", "gemini", "groq"]
+
+# Modèles Groq disponibles au moment de l'écriture (vérifie console.groq.com/docs/models
+# si tu veux la liste à jour : les modèles Groq évoluent/sont dépréciés régulièrement —
+# llama-3.3-70b-versatile a par exemple été retiré le 16/08/2026).
+DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b"
 
 CACHE_DIR = Path(".cache_audits")
 CACHE_DIR.mkdir(exist_ok=True)
@@ -216,6 +230,37 @@ def generate_with_ollama(company_name: str, raw_data: str, model_name: str,
     return response['message']['content']
 
 
+def generate_with_groq(company_name: str, raw_data: str, model_name: str,
+                        objectif: ObjectiveType = "general") -> str:
+    """
+    Génération via l'API Groq (inférence très rapide, modèles ouverts type Llama).
+    Utilise le mode JSON natif de l'API (response_format), comme Ollama avec format="json".
+    """
+    if not GROQ_AVAILABLE:
+        raise ImportError("Le package 'groq' n'est pas installé. Lance : pip install groq")
+
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise ValueError("Clé GROQ_API_KEY manquante dans le .env")
+
+    client = Groq(api_key=api_key)
+    prompt = build_full_prompt(company_name, raw_data, objectif)
+
+    response = client.chat.completions.create(
+        model=model_name,
+        messages=[
+            {
+                "role": "system",
+                "content": "Tu es un assistant JSON strict. Tu réponds UNIQUEMENT avec un objet JSON valide et rien d'autre.",
+            },
+            {"role": "user", "content": prompt},
+        ],
+        response_format={"type": "json_object"},
+        temperature=0.4,
+    )
+    return response.choices[0].message.content
+
+
 def generate_with_ollama_sectioned(company_name: str, raw_data: str, model_name: str,
                                     objectif: ObjectiveType = "general") -> dict:
     """
@@ -252,17 +297,18 @@ def generate_with_ollama_sectioned(company_name: str, raw_data: str, model_name:
 def generate_company_audit(
     company_name: str,
     raw_data: str,
-    provider: str = "ollama",
+    provider: ProviderType = "ollama",
     model_name: str = "qwen2.5:1.5b",
     objectif: ObjectiveType = "general",
     detailed: bool = True,
     use_cache: bool = True,
 ) -> CompanyAuditSchema:
     """
-    provider : "ollama" ou "gemini"
+    provider : "ollama", "gemini" ou "groq"
     objectif : adapte le contenu du rapport à l'usage réel (candidature, entretien, ...)
     detailed : si True et provider="ollama", utilise la génération sectionnée
                (plus lente mais beaucoup plus complète pour les petits modèles).
+               Sans effet pour "gemini" et "groq" (modèles assez puissants pour un seul appel).
     """
     cache_key = _cache_key(company_name, provider, model_name, objectif)
     if use_cache:
@@ -276,6 +322,9 @@ def generate_company_audit(
         else:
             raw_output = generate_with_ollama(company_name, raw_data, model_name, objectif)
             data = _try_parse(raw_output) or {}
+    elif provider == "groq":
+        raw_output = generate_with_groq(company_name, raw_data, model_name, objectif)
+        data = _try_parse(raw_output) or {}
     else:
         raw_output = generate_with_gemini(company_name, raw_data, model_name, objectif)
         data = _try_parse(raw_output) or {}
